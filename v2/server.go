@@ -25,8 +25,9 @@ import (
 
 // Server is the main Machinery object and stores all configuration
 // All the tasks workers process are registered against the server
+// 我们主程序需要注册此结构体来实现Machinery的一些功能
 type Server struct {
-	config            *config.Config
+	config            *config.Config   // 主要是redis相关配置
 	registeredTasks   *sync.Map
 	broker            brokersiface.Broker
 	backend           backendsiface.Backend
@@ -36,6 +37,7 @@ type Server struct {
 }
 
 // NewServer creates Server instance
+// 此处 new 服务的主入口
 func NewServer(cnf *config.Config, brokerServer brokersiface.Broker, backendServer backendsiface.Backend, lock lockiface.Lock) *Server {
 	srv := &Server{
 		config:          cnf,

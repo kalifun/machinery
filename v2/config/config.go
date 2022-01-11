@@ -14,13 +14,14 @@ import (
 
 const (
 	// DefaultResultsExpireIn is a default time used to expire task states and group metadata from the backend
+	// 任务过期默认时间
 	DefaultResultsExpireIn = 3600
 )
 
 var (
 	// Start with sensible default values
 	defaultCnf = &Config{
-		Broker:          "amqp://guest:guest@localhost:5672/",
+		Broker:          "amqp://guest:guest@localhost:5672/",  
 		DefaultQueue:    "machinery_tasks",
 		ResultBackend:   "amqp://guest:guest@localhost:5672/",
 		ResultsExpireIn: DefaultResultsExpireIn,
