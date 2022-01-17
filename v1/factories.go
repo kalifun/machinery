@@ -33,16 +33,21 @@ import (
 )
 
 // BrokerFactory creates a new object of iface.Broker
+// BrokerFactory创建了一个iface.Broker的新对象。
 // Currently only AMQP/S broker is supported
+// 目前只支持AMQP/S代理
 func BrokerFactory(cnf *config.Config) (brokeriface.Broker, error) {
+	// 判断broker配置前缀是否是"amqp://"
 	if strings.HasPrefix(cnf.Broker, "amqp://") {
 		return amqpbroker.New(cnf), nil
 	}
 
+	// 判断broker配置前缀是否是"amqps://"
 	if strings.HasPrefix(cnf.Broker, "amqps://") {
 		return amqpbroker.New(cnf), nil
 	}
 
+	// 判断broker配置是否是redis且采用的是"redis://"或"rediss://"
 	if strings.HasPrefix(cnf.Broker, "redis://") || strings.HasPrefix(cnf.Broker, "rediss://") {
 		var scheme string
 		if strings.HasPrefix(cnf.Broker, "redis://") {
@@ -61,6 +66,7 @@ func BrokerFactory(cnf *config.Config) (brokeriface.Broker, error) {
 		if len(brokers) > 1 || (cnf.Redis != nil && cnf.Redis.ClusterMode) {
 			return redisbroker.NewGR(cnf, brokers, 0), nil
 		} else {
+			// 解析redis的配置
 			redisHost, redisPassword, redisDB, err := ParseRedisURL(cnf.Broker)
 			if err != nil {
 				return nil, err
@@ -69,6 +75,7 @@ func BrokerFactory(cnf *config.Config) (brokeriface.Broker, error) {
 		}
 	}
 
+	// 如果是redis+socket形式则走这部分逻辑
 	if strings.HasPrefix(cnf.Broker, "redis+socket://") {
 		redisSocket, redisPassword, redisDB, err := ParseRedisSocketURL(cnf.Broker)
 		if err != nil {
@@ -78,15 +85,20 @@ func BrokerFactory(cnf *config.Config) (brokeriface.Broker, error) {
 		return redisbroker.New(cnf, "", redisPassword, redisSocket, redisDB), nil
 	}
 
+	// 采用的是内存方式
 	if strings.HasPrefix(cnf.Broker, "eager") {
 		return eagerbroker.New(), nil
 	}
 
+	// 亚马逊的sqs消息队列服务
 	if _, ok := os.LookupEnv("DISABLE_STRICT_SQS_CHECK"); ok {
 		//disable SQS name check, so that users can use this with local simulated SQS
+		//禁用SQS名称检查，这样用户就可以用本地模拟的SQS使用。
 		//where sql broker url might not start with https://sqs
+		//其中sql broker url可能不是以https://sqs 开始的。
 
 		//even when disabling strict SQS naming check, make sure its still a valid http URL
+		//即使在禁用严格的SQS命名检查时，也要确保它仍然是一个有效的http URL
 		if strings.HasPrefix(cnf.Broker, "https://") || strings.HasPrefix(cnf.Broker, "http://") {
 			return sqsbroker.New(cnf), nil
 		}
@@ -96,6 +108,7 @@ func BrokerFactory(cnf *config.Config) (brokeriface.Broker, error) {
 		}
 	}
 
+	// Google的消息队列服务
 	if strings.HasPrefix(cnf.Broker, "gcppubsub://") {
 		projectID, subscriptionName, err := ParseGCPPubSubURL(cnf.Broker)
 		if err != nil {
@@ -104,21 +117,25 @@ func BrokerFactory(cnf *config.Config) (brokeriface.Broker, error) {
 		return gcppubsubbroker.New(cnf, projectID, subscriptionName)
 	}
 
+	// 如果是其他配置则返回错误
 	return nil, fmt.Errorf("Factory failed with broker URL: %v", cnf.Broker)
 }
 
 // BackendFactory creates a new object of backends.Interface
+// BackendFactory创建一个backends.Interface的新对象。
 // Currently supported backends are AMQP/S and Memcache
+// 目前支持的backends是AMQP/S和Memcache
 func BackendFactory(cnf *config.Config) (backendiface.Backend, error) {
-
+	// amqp协议
 	if strings.HasPrefix(cnf.ResultBackend, "amqp://") {
 		return amqpbackend.New(cnf), nil
 	}
-
+	// amsps协议
 	if strings.HasPrefix(cnf.ResultBackend, "amqps://") {
 		return amqpbackend.New(cnf), nil
 	}
 
+	// memcache
 	if strings.HasPrefix(cnf.ResultBackend, "memcache://") {
 		parts := strings.Split(cnf.ResultBackend, "memcache://")
 		if len(parts) != 2 {
@@ -131,6 +148,7 @@ func BackendFactory(cnf *config.Config) (backendiface.Backend, error) {
 		return memcachebackend.New(cnf, servers), nil
 	}
 
+	// redis
 	if strings.HasPrefix(cnf.ResultBackend, "redis://") || strings.HasPrefix(cnf.ResultBackend, "rediss://") {
 		var scheme string
 		if strings.HasPrefix(cnf.ResultBackend, "redis://") {
@@ -153,6 +171,7 @@ func BackendFactory(cnf *config.Config) (backendiface.Backend, error) {
 		}
 	}
 
+	// redis + socket
 	if strings.HasPrefix(cnf.ResultBackend, "redis+socket://") {
 		redisSocket, redisPassword, redisDB, err := ParseRedisSocketURL(cnf.ResultBackend)
 		if err != nil {
@@ -162,23 +181,28 @@ func BackendFactory(cnf *config.Config) (backendiface.Backend, error) {
 		return redisbackend.New(cnf, "", redisPassword, redisSocket, redisDB), nil
 	}
 
+	// mongodb
 	if strings.HasPrefix(cnf.ResultBackend, "mongodb://") ||
 		strings.HasPrefix(cnf.ResultBackend, "mongodb+srv://") {
 		return mongobackend.New(cnf)
 	}
 
+	// 内存
 	if strings.HasPrefix(cnf.ResultBackend, "eager") {
 		return eagerbackend.New(), nil
 	}
 
+	// 不使用
 	if strings.HasPrefix(cnf.ResultBackend, "null") {
 		return nullbackend.New(), nil
 	}
 
+	// dynamodb(亚马逊云数据库)
 	if strings.HasPrefix(cnf.ResultBackend, "https://dynamodb") {
 		return dynamobackend.New(cnf), nil
 	}
 
+	// 不包含以上
 	return nil, fmt.Errorf("Factory failed with result backend: %v", cnf.ResultBackend)
 }
 
@@ -220,11 +244,15 @@ func ParseRedisURL(url string) (host, password string, db int, err error) {
 }
 
 // LockFactory creates a new object of iface.Lock
+// LockFactory创建一个iface.Lock的新对象。
 // Currently supported lock is redis
+// 目前支持的lock是redis
 func LockFactory(cnf *config.Config) (lockiface.Lock, error) {
+	// 如果用户使用的是"eager",则采用eagerlock
 	if strings.HasPrefix(cnf.Lock, "eager") {
 		return eagerlock.New(), nil
 	}
+	// 注：此处是redis的lock
 	if strings.HasPrefix(cnf.Lock, "redis://") {
 		parts := strings.Split(cnf.Lock, "redis://")
 		if len(parts) != 2 {
@@ -238,6 +266,7 @@ func LockFactory(cnf *config.Config) (lockiface.Lock, error) {
 	}
 
 	// Lock is required for periodic tasks to work, therefor return in memory lock in case none is configured
+	// 周期性任务的工作需要锁，因此在没有配置锁的情况下，返回内存中的锁。
 	return eagerlock.New(), nil
 }
 

@@ -67,6 +67,7 @@ func (b *Broker) Publish(signature *tasks.Signature) error {
 }
 
 // SetRegisteredTaskNames sets registered task names
+// 设置注册好的任务名称
 func (b *Broker) SetRegisteredTaskNames(names []string) {
 	b.registeredTaskNames.Lock()
 	defer b.registeredTaskNames.Unlock()
