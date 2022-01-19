@@ -11,14 +11,15 @@ var (
 )
 
 type Lock struct {
-	retries  int
-	interval time.Duration
+	retries  int	// 重试次数
+	interval time.Duration	// 重试等待时间
 	register struct {
 		sync.RWMutex
 		m map[string]int64
-	}
+	} 
 }
 
+// new 一个lock对象
 func New() *Lock {
 	return &Lock{
 		retries:  3,
@@ -32,6 +33,7 @@ func New() *Lock {
 	}
 }
 
+// 重试获取锁
 func (e *Lock) LockWithRetries(key string, value int64) error {
 	for i := 0; i <= e.retries; i++ {
 		err := e.Lock(key, value)
@@ -45,6 +47,7 @@ func (e *Lock) LockWithRetries(key string, value int64) error {
 	return ErrEagerLockFailed
 }
 
+// 重试从map种获取 如果不存在或时间不一致则写入
 func (e *Lock) Lock(key string, value int64) error {
 	e.register.Lock()
 	defer e.register.Unlock()

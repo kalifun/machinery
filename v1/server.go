@@ -259,7 +259,7 @@ func (server *Server) SendTask(signature *tasks.Signature) (*result.AsyncResult,
 func (server *Server) SendChainWithContext(ctx context.Context, chain *tasks.Chain) (*result.ChainAsyncResult, error) {
 	span, _ := opentracing.StartSpanFromContext(ctx, "SendChain", tracing.ProducerOption(), tracing.MachineryTag, tracing.WorkflowChainTag)
 	defer span.Finish()
-
+	// 在跨度上标记一些有关链的信息
 	tracing.AnnotateSpanWithChainInfo(span, chain)
 
 	return server.SendChain(chain)
@@ -277,13 +277,16 @@ func (server *Server) SendChain(chain *tasks.Chain) (*result.ChainAsyncResult, e
 }
 
 // SendGroupWithContext will inject the trace context in all the signature headers before publishing it
+// SendGroupWithContext将在发布前在所有签名头中注入跟踪上下文。
 func (server *Server) SendGroupWithContext(ctx context.Context, group *tasks.Group, sendConcurrency int) ([]*result.AsyncResult, error) {
 	span, _ := opentracing.StartSpanFromContext(ctx, "SendGroup", tracing.ProducerOption(), tracing.MachineryTag, tracing.WorkflowGroupTag)
 	defer span.Finish()
 
+	// 标记关于分组的信息
 	tracing.AnnotateSpanWithGroupInfo(span, group, sendConcurrency)
 
 	// Make sure result backend is defined
+	// 确保结果后端被定义
 	if server.backend == nil {
 		return nil, errors.New("Result backend required")
 	}
@@ -298,6 +301,7 @@ func (server *Server) SendGroupWithContext(ctx context.Context, group *tasks.Gro
 	server.backend.InitGroup(group.GroupUUID, group.GetUUIDs())
 
 	// Init the tasks Pending state first
+	// 将初始任务状态设置为待定
 	for _, signature := range group.Tasks {
 		if err := server.backend.SetStatePending(signature); err != nil {
 			errorsChan <- err
@@ -305,6 +309,7 @@ func (server *Server) SendGroupWithContext(ctx context.Context, group *tasks.Gro
 		}
 	}
 
+	// 并发池子
 	pool := make(chan struct{}, sendConcurrency)
 	go func() {
 		for i := 0; i < sendConcurrency; i++ {
@@ -322,7 +327,7 @@ func (server *Server) SendGroupWithContext(ctx context.Context, group *tasks.Gro
 			defer wg.Done()
 
 			// Publish task
-
+			// 将任务存储到broker
 			err := server.broker.Publish(ctx, s)
 
 			if sendConcurrency > 0 {
@@ -353,15 +358,18 @@ func (server *Server) SendGroupWithContext(ctx context.Context, group *tasks.Gro
 }
 
 // SendGroup triggers a group of parallel tasks
+// SendGroup 触发一组并行任务
 func (server *Server) SendGroup(group *tasks.Group, sendConcurrency int) ([]*result.AsyncResult, error) {
 	return server.SendGroupWithContext(context.Background(), group, sendConcurrency)
 }
 
 // SendChordWithContext will inject the trace context in all the signature headers before publishing it
+// SendChordWithContext将在发布前在所有签名头中注入跟踪上下文。
 func (server *Server) SendChordWithContext(ctx context.Context, chord *tasks.Chord, sendConcurrency int) (*result.ChordAsyncResult, error) {
 	span, _ := opentracing.StartSpanFromContext(ctx, "SendChord", tracing.ProducerOption(), tracing.MachineryTag, tracing.WorkflowChordTag)
 	defer span.Finish()
 
+	// 在跨度上标记一些有chord的信息
 	tracing.AnnotateSpanWithChordInfo(span, chord, sendConcurrency)
 
 	_, err := server.SendGroupWithContext(ctx, chord.Group, sendConcurrency)
@@ -377,14 +385,16 @@ func (server *Server) SendChordWithContext(ctx context.Context, chord *tasks.Cho
 }
 
 // SendChord triggers a group of parallel tasks with a callback
+// SendChord 触发了一组带有回调的并行任务
 func (server *Server) SendChord(chord *tasks.Chord, sendConcurrency int) (*result.ChordAsyncResult, error) {
 	return server.SendChordWithContext(context.Background(), chord, sendConcurrency)
 }
 
 // GetRegisteredTaskNames returns slice of registered task names
+// GetRegisteredTaskNames 以切片方式返回所有注册的任务名称
 func (server *Server) GetRegisteredTaskNames() []string {
 	taskNames := make([]string, 0)
-
+	// 从registeredTasks种获取
 	server.registeredTasks.Range(func(key, value interface{}) bool {
 		taskNames = append(taskNames, key.(string))
 		return true
@@ -393,13 +403,16 @@ func (server *Server) GetRegisteredTaskNames() []string {
 }
 
 // RegisterPeriodicTask register a periodic task which will be triggered periodically
+// RegisterPeriodicTask 注册一个周期性任务，该任务将被周期性触发
 func (server *Server) RegisterPeriodicTask(spec, name string, signature *tasks.Signature) error {
 	//check spec
+	// 检查提交的是否是crontab规范
 	schedule, err := cron.ParseStandard(spec)
 	if err != nil {
 		return err
 	}
 
+	// 定时任务执行的方法(写入)
 	f := func() {
 		//get lock
 		err := server.lock.LockWithRetries(utils.GetLockName(name, spec), schedule.Next(time.Now()).UnixNano()-1)
@@ -419,6 +432,7 @@ func (server *Server) RegisterPeriodicTask(spec, name string, signature *tasks.S
 }
 
 // RegisterPeriodicChain register a periodic chain which will be triggered periodically
+//RegisterPeriodicChain 注册一个将周期性触发的周期性链
 func (server *Server) RegisterPeriodicChain(spec, name string, signatures ...*tasks.Signature) error {
 	//check spec
 	schedule, err := cron.ParseStandard(spec)

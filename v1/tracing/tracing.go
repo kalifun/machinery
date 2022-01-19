@@ -100,6 +100,7 @@ func AnnotateSpanWithSignatureInfo(span opentracing.Span, signature *tasks.Signa
 // AnnotateSpanWithChainInfo ...
 func AnnotateSpanWithChainInfo(span opentracing.Span, chain *tasks.Chain) {
 	// tag the span with some info about the chain
+	// 在跨度上标记一些有关链的信息
 	span.SetTag("chain.tasks.length", len(chain.Tasks))
 
 	// inject the tracing span into the tasks signature headers
@@ -111,11 +112,13 @@ func AnnotateSpanWithChainInfo(span opentracing.Span, chain *tasks.Chain) {
 // AnnotateSpanWithGroupInfo ...
 func AnnotateSpanWithGroupInfo(span opentracing.Span, group *tasks.Group, sendConcurrency int) {
 	// tag the span with some info about the group
-	span.SetTag("group.uuid", group.GroupUUID)
-	span.SetTag("group.tasks.length", len(group.Tasks))
-	span.SetTag("group.concurrency", sendConcurrency)
+	// 在跨度上标记一些关于小组的信息
+	span.SetTag("group.uuid", group.GroupUUID)  // 组uuid
+	span.SetTag("group.tasks.length", len(group.Tasks))	// 组任务长度
+	span.SetTag("group.concurrency", sendConcurrency)	// 并发数
 
 	// encode the task uuids to json, if that fails just dump it in
+	// 将任务uuids编码为json，如果失败了，就把它倒入
 	if taskUUIDs, err := json.Marshal(group.GetUUIDs()); err == nil {
 		span.SetTag("group.tasks", string(taskUUIDs))
 	} else {
@@ -123,6 +126,7 @@ func AnnotateSpanWithGroupInfo(span opentracing.Span, group *tasks.Group, sendCo
 	}
 
 	// inject the tracing span into the tasks signature headers
+	// 在任务签名头中注入追踪跨度
 	for _, signature := range group.Tasks {
 		signature.Headers = HeadersWithSpan(signature.Headers, span)
 	}
@@ -131,11 +135,14 @@ func AnnotateSpanWithGroupInfo(span opentracing.Span, group *tasks.Group, sendCo
 // AnnotateSpanWithChordInfo ...
 func AnnotateSpanWithChordInfo(span opentracing.Span, chord *tasks.Chord, sendConcurrency int) {
 	// tag the span with chord specific info
+	// 用chord的具体信息标记跨度
 	span.SetTag("chord.callback.uuid", chord.Callback.UUID)
 
 	// inject the tracing span into the callback signature
+	// 在回调签名中注入追踪跨度
 	chord.Callback.Headers = HeadersWithSpan(chord.Callback.Headers, span)
 
 	// tag the span for the group part of the chord
+	// 为chord的群组部分标记跨度
 	AnnotateSpanWithGroupInfo(span, chord.Group, sendConcurrency)
 }

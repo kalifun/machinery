@@ -15,12 +15,14 @@ var (
 )
 
 type Lock struct {
-	rclient  redis.UniversalClient
-	retries  int
-	interval time.Duration
+	rclient  redis.UniversalClient	// redis client
+	retries  int	// 重试次数
+	interval time.Duration	// 重试等待时间
 }
 
+// new 一个lock对象
 func New(cnf *config.Config, addrs []string, db, retries int) Lock {
+	// 理论上应该加一个默认重试次数。直接返回又没有成功生成一个对象
 	if retries <= 0 {
 		return Lock{}
 	}
@@ -48,6 +50,7 @@ func New(cnf *config.Config, addrs []string, db, retries int) Lock {
 	return lock
 }
 
+// 重试锁
 func (r Lock) LockWithRetries(key string, unixTsToExpireNs int64) error {
 	for i := 0; i <= r.retries; i++ {
 		err := r.Lock(key, unixTsToExpireNs)
@@ -62,6 +65,7 @@ func (r Lock) LockWithRetries(key string, unixTsToExpireNs int64) error {
 }
 
 func (r Lock) Lock(key string, unixTsToExpireNs int64) error {
+	// 计算一个过期时间
 	now := time.Now().UnixNano()
 	expiration := time.Duration(unixTsToExpireNs + 1 - now)
 	ctx := r.rclient.Context()
@@ -72,6 +76,7 @@ func (r Lock) Lock(key string, unixTsToExpireNs int64) error {
 	}
 
 	if !success {
+		// 查看是否已经存在了此key
 		v, err := r.rclient.Get(ctx, key).Result()
 		if err != nil {
 			return err
@@ -80,7 +85,7 @@ func (r Lock) Lock(key string, unixTsToExpireNs int64) error {
 		if err != nil {
 			return err
 		}
-
+		// 存储的时间不等于0且现在的时间大于了存储的时间则重新写入
 		if timeout != 0 && now > int64(timeout) {
 			newTimeout, err := r.rclient.GetSet(ctx, key, unixTsToExpireNs).Result()
 			if err != nil {

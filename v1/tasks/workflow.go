@@ -19,6 +19,7 @@ type Group struct {
 
 // Chord adds an optional callback to the group to be executed
 // after all tasks in the group finished
+// Chord为该组添加了一个可选的回调，以便在该组所有任务完成后执行。
 type Chord struct {
 	Group    *Group
 	Callback *Signature
